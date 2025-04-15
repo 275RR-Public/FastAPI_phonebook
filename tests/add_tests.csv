@@ -1,0 +1,66 @@
+full_name,phone_number,expected_status
+"Bruce Schneier","12345",200
+"Bruce Schneier","(703) 111-2121",200
+"Bruce Schneier","123-1234",200
+"Bruce Schneier","+1(703) 111-2121",200
+"Bruce Schneier","+32 (21) 212-2324",200
+"Schneier, Bruce Wayne","12345",200
+"Schneier, Bruce Wayne","(703) 111-2121",200
+"Schneier, Bruce Wayne","123-1234",200
+"Schneier, Bruce Wayne","+1(703) 111-2121",200
+"Schneier, Bruce Wayne","+32 (21) 212-2324",200
+"John O'Malley-Smith","12345",200
+"John O’Malley-Smith","12345",200
+"John O'Malley-Smith","(703) 111-2121",200
+"John O'Malley-Smith","123-1234",200
+"John O'Malley-Smith","+1(703) 111-2121",200
+"John O'Malley-Smith","+32 (21) 212-2324",200
+"Schneier, Bruce","123",400
+"Schneier, Bruce","1/703/123/1234",400
+"Schneier, Bruce","Nr 102-123-1234",400
+"Schneier, Bruce","<script>alert (""XSS"") </script>",400
+"Schneier, Bruce","7031111234",400
+"O'Malley, John F.","123",400
+"O'Malley, John F.","1/703/123/1234",400
+"O'Malley, John F.","Nr 102-123-1234",400
+"O'Malley, John F.","<script>alert (""XSS"") </script>",400
+"O'Malley, John F.","7031111234",400
+"Cher","123",400
+"Cher","1/703/123/1234",400
+"Cher","Nr 102-123-1234",400
+"Cher","<script>alert (""XSS"") </script>",400
+"Cher","7031111234",400
+"Ron O''Henry","1(703) 123-1234",400
+"Ron O'’Henry","1(703) 123-1234",400
+"Ron O’'Henry","1(703) 123-1234",400
+"Ron O’’Henry","1(703) 123-1234",400
+"Ron O''Henry","0117011111234",400
+"Ron O''Henry","12345.12345",400
+"Ron O''Henry","01117031111234",400
+"Ron O''Henry","+1(703) 111-2121",400
+"L33t Hacker","1(703) 123-1234",400
+"L33t Hacker","0117011111234",400
+"L33t Hacker","12345.12345",400
+"L33t Hacker","01117031111234",400
+"L33t Hacker","+1(703) 111-2121",400
+"Brad Everett Samuel Smith","1(703) 123-1234",400
+"Brad Everett Samuel Smith","0117011111234",400
+"Brad Everett Samuel Smith","12345.12345",400
+"Brad Everett Samuel Smith","01117031111234",400
+"Brad Everett Samuel Smith","+1(703) 111-2121",400
+"Ron O'Henry-Smith-Barnes","+1234 (201) 123-1234",400
+"Ron O'Henry-Smith-Barnes","(001) 123-1234",400
+"Ron O'Henry-Smith-Barnes","+01 (703) 123-1234",400
+"Ron O'Henry-Smith-Barnes","(703) 123-1234 ext 204",400
+"Ron O'Henry-Smith-Barnes","1/703/123/1234",400
+"<Script>alert(""XSS"")</Script>","+1234 (201) 123-1234",400
+"<Script>alert(""XSS"")</Script>","(001) 123-1234",400
+"<Script>alert(""XSS"")</Script>","+01 (703) 123-1234",400
+"<Script>alert(""XSS"")</Script>","(703) 123-1234 ext 204",400
+"<Script>alert(""XSS"")</Script>","1/703/123/1234",400
+"%'","12345",400
+"select * from users;","+1234 (201) 123-1234",400
+"select * from users;","(001) 123-1234",400
+"select * from users;","+01 (703) 123-1234",400
+"select * from users;","(703) 123-1234 ext 204",400
+"select * from users;","1/703/123/1234",400

@@ -1,0 +1,21 @@
+full_name,add_before,expected_status
+"Bruce Schneier",true,200
+"Schneier, Bruce",true,200
+"Schneier, Bruce Wayne",true,200
+"O'Malley, John F.",true,200
+"John O'Malley-Smith",true,200
+"John O’Malley-Smith",true,200
+"Cher",true,200
+"Bruce Schneier",false,404
+"Schneier, Bruce",false,404
+"Schneier, Bruce Wayne",false,404
+"O'Malley, John F.",false,404
+"John O'Malley-Smith",false,404
+"Cher",false,404
+"Ron O''Henry",false,400
+"Ron O'Henry-Smith-Barnes",false,400
+"L33t Hacker",false,400
+"<Script>alert(""XSS"")</Script>",false,400
+"%'",false,400
+"Brad Everett Samuel Smith",false,400
+"select * from users;",false,400
