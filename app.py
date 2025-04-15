@@ -12,7 +12,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 app = FastAPI()
 
 # SQLite database setup
-engine = create_engine("sqlite:///phonebook.db", echo=True)
+engine = create_engine("sqlite:///phonebook.db", echo=False)
 Base = declarative_base()
 
 # Database model
@@ -81,6 +81,7 @@ async def validation_exception_handler(request, exc):
     return JSONResponse(status_code=400, content={"detail": error_messages})
 
 # API Endpoints (list, add, delete by name, delete by number)
+# Uses parameterized queries
 @app.get("/PhoneBook/list")
 def list_phonebook():
     """List all phonebook entries."""

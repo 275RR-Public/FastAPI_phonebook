@@ -18,6 +18,7 @@
 4) https://regex101.com/
     - name = https://regex101.com/r/ftDpSv/1
     - num = https://regex101.com/r/cyYTj9/1
+5) https://medium.com/@ramanbazhanau/mastering-sqlalchemy-a-comprehensive-guide-for-python-developers-ddb3d9f2e829
 
 ## Usage
 - pytest tests/test_phonebook.py
