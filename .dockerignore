@@ -23,8 +23,9 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
-LICENSE
-README.md
-Plan.md
+
+**/.pytest_cache
+**/LICENSE
+**/*.md
 **/docs
-*.db
+**/*.db

@@ -1,117 +1,70 @@
-
-import re
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, field_validator
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base, sessionmaker
+from fastapi.security import OAuth2PasswordRequestForm
+from libs.database import engine, Base, get_db
+from libs.models import PhoneBook, Person, User
+from libs.auth import pwd_context, users, create_access_token, require_roles
+from libs.config import ACCESS_TOKEN_EXPIRE_MINUTES
+from sqlalchemy.orm import Session
+from typing import List
+from datetime import timedelta
 
-# Note: Bad Request = 400 and Not Found = 404
-# Create the FastAPI app
+
 app = FastAPI()
 
-# SQLite database setup
-engine = create_engine("sqlite:///phonebook.db", echo=False)
-Base = declarative_base()
-
-# Database model
-class PhoneBook(Base):
-    __tablename__ = "phonebook"
-    id = Column(Integer, primary_key=True)
-    full_name = Column(String)
-    phone_number = Column(String)
-
 # Create database schema
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
+Base.metadata.create_all(bind=engine)
 
-# Pydantic model with centralized validation
-class Person(BaseModel):
-    full_name: str
-    phone_number: str
-
-    @field_validator('full_name')
-    @classmethod
-    def validate_full_name(cls, v: str) -> str:
-        if not re.match(r'^[a-zA-Z.,\'\u2019 -]+$', v):
-            raise ValueError('Invalid characters in name')
-        if re.search(r"['’]{2}", v):
-            raise ValueError('Consecutive apostrophes are not allowed')
-        parts = v.split()
-        if len(parts) > 3:
-            raise ValueError('Name has too many parts')
-        for part in parts:
-            if part.count('-') > 1:
-                raise ValueError('Name has too many hyphens')
-        return v
-
-    @field_validator('phone_number')
-    @classmethod
-    def validate_phone_number(cls, v: str) -> str:
-        if not re.match(r'^[+\d()-. ]+$', v):
-            raise ValueError('Invalid characters in phone number')
-        
-        digits = re.sub(r'\D', '', v)
-        if len(digits) < 5 or len(digits) > 15:
-            raise ValueError('Phone number must have between 5 and 15 digits')
-
-        extension_pattern = r'^\d{5}$'
-        na_pattern = r'^(\+1|1)?\s*(\([2-9]\d{2}\)|[2-9]\d{2})[-.\s]\d{3}[-.\s]\d{4}$|^(\+1|1)?\s*\d{3}[-.\s]\d{4}$'
-        intl_pattern = r'^\+[1-9]\d{0,2}(?![0-9])[ -.()]*\d+([ -.()]*\d+)*[ -.()]*$'
-        idd_pattern = r'^011\d+$'
-        danish_pattern = r'^(\d{2}[ -.]){3}\d{2}$|^\d{4}[ -.]\d{4}$'
-        general_pattern = r'^\d+([ -.]\d+)+$'
-
-        if (re.match(extension_pattern, v) or
-            re.match(na_pattern, v) or
-            re.match(intl_pattern, v) or
-            re.match(idd_pattern, v) or
-            re.match(danish_pattern, v) or
-            re.match(general_pattern, v)):
-            return v
-        else:
-            raise ValueError('Phone number does not match any acceptable format')
-
-# Custom exception handler for validation errors (returns 400)
+# Custom exception handler for validation errors
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     errors = exc.errors()
     error_messages = [f"{error['loc'][0]}: {error['msg']}" for error in errors]
     return JSONResponse(status_code=400, content={"detail": error_messages})
 
-# API Endpoints (list, add, delete by name, delete by number)
+
+# API Endpoints (token, list, add, deleteByName, deleteByNumber)
 # Uses parameterized queries
+# Uses authentication and authorization
+@app.post("/token")
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    """Login endpoint to obtain token"""
+    user = users.get(form_data.username)
+    if not user or not pwd_context.verify(form_data.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"], "role": user["role"]},
+        expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.get("/PhoneBook/list")
-def list_phonebook():
+def list_phonebook(db: Session = Depends(get_db), current_user: User = Depends(require_roles(["Read", "ReadWrite"]))):
     """List all phonebook entries."""
-    session = Session()
-    phonebook = session.query(PhoneBook).all()
-    session.close()
+    phonebook = db.query(PhoneBook).all()
     return phonebook
 
 @app.post("/PhoneBook/add")
-def add_person(person: Person):
+def add_person(person: Person, db: Session = Depends(get_db), current_user: User = Depends(require_roles(["ReadWrite"]))):
     """
     Add a person with validated name and number.
         - Validate input as a name and a number by Person class
         - Check that person does not already exist in db by name or number
         - Add person
     """
-    session = Session()
-    existing_by_name = session.query(PhoneBook).filter_by(full_name=person.full_name).first()
-    existing_by_number = session.query(PhoneBook).filter_by(phone_number=person.phone_number).first()
+    existing_by_name = db.query(PhoneBook).filter_by(full_name=person.full_name).first()
+    existing_by_number = db.query(PhoneBook).filter_by(phone_number=person.phone_number).first()
     if existing_by_name or existing_by_number:
-        session.close()
         raise HTTPException(status_code=400, detail="Person already exists in the database")
     new_person = PhoneBook(full_name=person.full_name, phone_number=person.phone_number)
-    session.add(new_person)
-    session.commit()
-    session.close()
+    db.add(new_person)
+    db.commit()
     return {"message": "Person added successfully"}
 
 @app.put("/PhoneBook/deleteByName")
-def delete_by_name(full_name: str):
+def delete_by_name(full_name: str, db: Session = Depends(get_db), current_user: User = Depends(require_roles(["ReadWrite"]))):
     """
     Delete a person by name with validation.
         - Validate input as a name
@@ -122,18 +75,15 @@ def delete_by_name(full_name: str):
         Person.validate_full_name(full_name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    session = Session()
-    person = session.query(PhoneBook).filter_by(full_name=full_name).first()
+    person = db.query(PhoneBook).filter_by(full_name=full_name).first()
     if not person:
-        session.close()
         raise HTTPException(status_code=404, detail="Person not found in the database")
-    session.delete(person)
-    session.commit()
-    session.close()
+    db.delete(person)
+    db.commit()
     return {"message": "Person deleted successfully"}
 
 @app.put("/PhoneBook/deleteByNumber")
-def delete_by_number(phone_number: str):
+def delete_by_number(phone_number: str, db: Session = Depends(get_db), current_user: User = Depends(require_roles(["ReadWrite"]))):
     """
     Delete a person by phone number with validation.
         - Validate input as a phone number
@@ -144,12 +94,9 @@ def delete_by_number(phone_number: str):
         Person.validate_phone_number(phone_number)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    session = Session()
-    person = session.query(PhoneBook).filter_by(phone_number=phone_number).first()
+    person = db.query(PhoneBook).filter_by(phone_number=phone_number).first()
     if not person:
-        session.close()
         raise HTTPException(status_code=404, detail="Person not found in the database")
-    session.delete(person)
-    session.commit()
-    session.close()
+    db.delete(person)
+    db.commit()
     return {"message": "Person deleted successfully"}

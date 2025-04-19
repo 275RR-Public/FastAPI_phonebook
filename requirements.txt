@@ -12,10 +12,14 @@ httpx
 idna
 iniconfig
 packaging
+passlib[bcrypt]
 pluggy
 pydantic
 pydantic_core
+pyjwt
 pytest
+python-dotenv
+python-multipart
 sniffio
 SQLAlchemy
 starlette
