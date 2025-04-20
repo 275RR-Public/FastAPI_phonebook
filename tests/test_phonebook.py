@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from libs.database import Base, get_db
 from libs.models import PhoneBook
 from app import app
-import csv
+import csv, os, logging
 
 
 TEST_DATABASE_URL = "sqlite:///test_phonebook.db"
@@ -36,6 +36,19 @@ def clear_database():
     session.commit()
     session.close()
 
+# Fixture to clear the logs before each test
+@pytest.fixture
+def clear_log_file():
+    audit_logger = logging.getLogger("audit")
+    # Close and remove all handlers to release the file lock
+    # Use a copy to avoid modifying list during iteration
+    for handler in audit_logger.handlers[:]:
+        handler.close()
+        audit_logger.removeHandler(handler)
+    # Now safe to delete the file
+    if os.path.exists('audit.log'):
+        os.remove('audit.log')
+
 
 # Test client fixture
 @pytest.fixture(scope="module")
@@ -54,6 +67,12 @@ def readwrite_user_token(client):
     response = client.post("/token", data={"username": "rwuser", "password": "rwpassword"})
     return response.json()["access_token"]
 
+
+# Check logs for expected message
+def check_audit_log(expected_message):
+    with open('audit.log', 'r') as f:
+        logs = f.read()
+        return expected_message in logs
 
 # Load test cases from CSV files
 def load_add_test_cases():
@@ -111,26 +130,51 @@ def test_all_endpoints_with_readwrite_user(client, readwrite_user_token):
     response = client.put("/PhoneBook/deleteByName", params={"full_name": "Bruce Schneier"}, headers=headers)
     assert response.status_code == 200
 
+def test_list_with_read_user(client, read_user_token, clear_log_file):
+    headers = {"Authorization": f"Bearer {read_user_token}"}
+    response = client.get("/PhoneBook/list", headers=headers)
+    assert response.status_code == 200
+    expected_log = "User: readuser - Action: list - Status: 200"
+    assert check_audit_log(expected_log), "Audit log missing for list operation"
+
 
 # Parameterized Tests Using CSV Data
 @pytest.mark.parametrize("full_name, phone_number, expected_status", load_add_test_cases())
-def test_add_person(client, readwrite_user_token, full_name, phone_number, expected_status):
+def test_add_person(client, readwrite_user_token, full_name, phone_number, expected_status, clear_log_file):
     headers = {"Authorization": f"Bearer {readwrite_user_token}"}
     response = client.post("/PhoneBook/add", json={"full_name": full_name, "phone_number": phone_number}, headers=headers)
     assert response.status_code == expected_status
+    if expected_status == 200:
+        expected_log = f"User: rwuser - Action: add - Added: {full_name}"
+        assert check_audit_log(expected_log), f"Audit log missing for add: {full_name}"
+    else:
+        expected_log = "User: rwuser - Action: add - Failed to add:"
+        assert check_audit_log(expected_log), f"Audit log missing for failed add: {full_name}"
 
 @pytest.mark.parametrize("full_name, add_before, expected_status", load_delete_by_name_test_cases())
-def test_delete_by_name(client, readwrite_user_token, full_name, add_before, expected_status):
+def test_delete_by_name(client, readwrite_user_token, full_name, add_before, expected_status, clear_log_file):
     headers = {"Authorization": f"Bearer {readwrite_user_token}"}
     if add_before:
         client.post("/PhoneBook/add", json={"full_name": full_name, "phone_number": "12345"}, headers=headers)
     response = client.put("/PhoneBook/deleteByName", params={"full_name": full_name}, headers=headers)
     assert response.status_code == expected_status
+    if expected_status == 200:
+        expected_log = f"User: rwuser - Action: deleteByName - Deleted by name: {full_name}"
+        assert check_audit_log(expected_log), f"Audit log missing for deleteByName: {full_name}"
+    else:
+        expected_log = "User: rwuser - Action: deleteByName - Failed to delete by name:"
+        assert check_audit_log(expected_log), f"Audit log missing for failed deleteByName: {full_name}"
 
 @pytest.mark.parametrize("phone_number, add_before, expected_status", load_delete_by_number_test_cases())
-def test_delete_by_number(client, readwrite_user_token, phone_number, add_before, expected_status):
+def test_delete_by_number(client, readwrite_user_token, phone_number, add_before, expected_status, clear_log_file):
     headers = {"Authorization": f"Bearer {readwrite_user_token}"}
     if add_before:
         client.post("/PhoneBook/add", json={"full_name": "Test Person", "phone_number": phone_number}, headers=headers)
     response = client.put("/PhoneBook/deleteByNumber", params={"phone_number": phone_number}, headers=headers)
     assert response.status_code == expected_status
+    if expected_status == 200:
+        expected_log = "User: rwuser - Action: deleteByNumber - Deleted by number: Test Person"
+        assert check_audit_log(expected_log), f"Audit log missing for deleteByNumber: {phone_number}"
+    else:
+        expected_log = "User: rwuser - Action: deleteByNumber - Failed to delete by number:"
+        assert check_audit_log(expected_log), f"Audit log missing for failed deleteByNumber: {phone_number}"

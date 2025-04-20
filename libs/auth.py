@@ -4,13 +4,14 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from libs.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from libs.models import User
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Request
 from typing import List, Annotated
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Hardcoded users
+# REST API uses OAuth2.0 JWT with Roles
+# Hardcoded users bypasses paying for Cloud Services
 users = {
     "readuser": {
         "username": "readuser",
@@ -56,3 +57,20 @@ def require_roles(roles: List[str]):
             raise HTTPException(status_code=403, detail="Insufficient privileges")
         return current_user
     return dependency
+
+
+def get_username_from_token(request: Request) -> str:
+    """
+    Extracts and decodes the JWT token from the request headers to retrieve the username.
+    Returns "unknown" if the token is missing, invalid, or cannot be decoded.
+    """
+    try:
+        token = request.headers.get("Authorization", "").split("Bearer ")[1]
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            return "unknown"
+        return username
+    except (IndexError, AttributeError, jwt.PyJWTError):
+        # Handle cases where the token is missing, malformed, or invalid
+        return "unknown"

@@ -8,3 +8,4 @@ docs
 *.db
 Plan.md
 .env
+*.log
